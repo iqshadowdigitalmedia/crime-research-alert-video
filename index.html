@@ -3,31 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>क्राइम रिसर्च डिस्क्लेमर वीडियो</title>
+<title>डिस्क्लेमर वीडियो</title>
 <style>
-:root{--bg:#121212;--card:#1e1e1e;--accent:#bb86fc;--text:#e0e0e0;--muted:#a0a0a0;}
+:root{--bg:#0f1115;--card:#1a1d24;--accent:#4f7cff;--text:#eee;--muted:#9aa1ad;}
 @media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f4f5f7;--card:#fff;--text:#111;--muted:#666;}}
 *{box-sizing:border-box;}
 body{margin:0;background:var(--bg);color:var(--text);font-family:sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
-h1{font-size:1.2rem;padding:16px;margin:0;text-align:center;}
+h1{font-size:1.2rem;padding:16px;margin:0;}
 .wrap{max-width:480px;margin:0 auto;padding:0 12px 40px;}
 canvas{width:100%;border-radius:10px;background:#000;display:block;}
 .slide{background:var(--card);border-radius:10px;padding:10px;margin:10px 0;}
-.slide textarea{width:100%;min-height:70px;background:transparent;color:var(--text);border:1px solid #444;border-radius:6px;padding:8px;font-size:13px;}
+.slide textarea{width:100%;min-height:70px;background:transparent;color:var(--text);border:1px solid #444;border-radius:6px;padding:8px;font-size:14px;}
 .row{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;}
+.row2{display:flex;gap:8px;align-items:center;margin-top:6px;}
+.row2 input[type=text]{width:60px;padding:4px;border-radius:4px;border:1px solid #444;background:transparent;color:var(--text);text-align:center;font-size:20px;}
 input[type=color]{width:36px;height:30px;border:none;background:none;}
 input[type=number]{width:60px;padding:4px;}
-button{background:var(--accent);color:#000;border:none;padding:8px 14px;border-radius:6px;font-size:14px;font-weight:bold;}
-button.secondary{background:#3700b3;color:#fff;}
-button.del{background:#cf6679;color:#000;}
-.controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;justify-content:center;}
+button{background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:14px;}
+button.secondary{background:#333;}
+button.del{background:#a33;}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;}
 label{font-size:12px;color:var(--muted);}
-#status{font-size:13px;color:var(--accent);margin-top:8px;text-align:center;}
-a#dl{display:none;margin-top:10px;text-align:center;font-weight:bold;}
+#status{font-size:13px;color:var(--muted);margin-top:8px;}
+a#dl{display:none;margin-top:10px;}
 </style>
 </head>
 <body>
-<h1>⚖️ डिस्क्लेमर & अवेयरनेस वीडियो जेनरेटर</h1>
+<h1>⚖️ डिस्क्लेमर वीडियो जेनरेटर</h1>
 <div class="wrap">
 <canvas id="cv" width="720" height="1280"></canvas>
 <div id="status"></div>
@@ -36,79 +38,69 @@ a#dl{display:none;margin-top:10px;text-align:center;font-weight:bold;}
 <button class="secondary" onclick="addSlide()">+ नई स्लाइड</button>
 <button onclick="exportVideo()">⬇ वीडियो बनाएं</button>
 </div>
-<a id="dl">💾 वीडियो डाउनलोड करें (.webm)</a>
+<a id="dl">वीडियो डाउनलोड करें</a>
 <div id="slides"></div>
 </div>
 <script>
-// --- Aapka Custom Disclaimer & Awareness Content ---
 let slides = [
- {
-  text: "डिस्क्लेमर:\n\nइस चैनल पर साझा की गई जानकारी निर्माता के व्यक्तिगत शोध और जनहित में जागरूकता फैलाने के उद्देश्य पर आधारित है।", 
-  color: "#1a1a2e", 
-  dur: 7
- },
- {
-  text: "यह किसी को बदनाम करने के लिए नहीं है।\n\nदर्शकों से अनुरोध है कि भुगतान करने से पहले स्वयं जाँच-पड़ताल अवश्य करें।", 
-  color: "#2e1a1a", 
-  dur: 7
- },
- {
-  text: "⚠️ ठगी हो जाए तो तुरंत...\n\n📞 1930 पर कॉल करें\n💻 cybercrime.gov.in पर शिकायत दर्ज करें।", 
-  color: "#1a2e1a", 
-  dur: 8
- },
- {
-  text: "उपयोगी लगे तो...\n\n चैनल को Subscribe करें\nऔर अपनों के साथ Share करें!", 
-  color: "#2e2e1a", 
-  dur: 5
- }
+ {text:"डिस्क्लेमर:\nइस चैनल पर साझा की गई जानकारी निर्माता के व्यक्तिगत शोध, सार्वजनिक रूप से उपलब्ध जानकारी और जनहित में जागरूकता फैलाने के उद्देश्य पर आधारित है।", color:"#0a0c12", color2:"#1a1a2e", icon:"⚖️", dur:7},
+ {text:"इस चैनल का उद्देश्य किसी भी व्यक्ति, संस्था या संगठन को बदनाम करना अथवा नुकसान पहुँचाना नहीं है।\nदर्शकों से अनुरोध है कि किसी भी संस्था से जुड़ने या भुगतान करने से पहले स्वयं जाँच-पड़ताल अवश्य करें।", color:"#1a1a2e", color2:"#2e1a1a", icon:"ℹ️", dur:8},
+ {text:"ठगी हो जाए तो तुरंत\n📞 1930 पर कॉल करें\nया cybercrime.gov.in पर शिकायत दर्ज करें", color:"#0e3a1f", color2:"#1a2e1a", icon:"✅", dur:6},
+ {text:"उपयोगी लगे तो चैनल को Subscribe करें\nऔर अपनों के साथ Share करें!", color:"#1a2e5a", color2:"#2e1a5a", icon:"🔔", dur:5}
 ];
-// --------------------------------------------------
-
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 function render(){
  const box=document.getElementById('slides'); box.innerHTML='';
  slides.forEach((s,i)=>{
   const d=document.createElement('div'); d.className='slide';
-  d.innerHTML=`<textarea rows="3" onchange="slides[${i}].text=this.value">${s.text}</textarea>
+  d.innerHTML=`<textarea onchange="slides[${i}].text=this.value">${s.text}</textarea>
   <div class="row">
-   <label>रंग</label><input type="color" value="${s.color}" onchange="slides[${i}].color=this.value">
-   <label>सेकंड</label><input type="number" value="${s.dur}" min="1" max="25" onchange="slides[${i}].dur=+this.value">
+   <label>रंग 1</label><input type="color" value="${s.color}" onchange="slides[${i}].color=this.value">
+   <label>रंग 2</label><input type="color" value="${s.color2||s.color}" onchange="slides[${i}].color2=this.value">
+   <label>सेकंड</label><input type="number" value="${s.dur}" min="1" max="15" onchange="slides[${i}].dur=+this.value">
+  </div>
+  <div class="row2">
+   <label>आइकन</label><input type="text" maxlength="2" value="${s.icon||''}" onchange="slides[${i}].icon=this.value">
    <button class="del" onclick="slides.splice(${i},1);render()">हटाएं</button>
   </div>`;
   box.appendChild(d);
  });
 }
-function addSlide(){slides.push({text:"नया टेक्स्ट",color:"#222",dur:5}); render();}
+function addSlide(){slides.push({text:"नया टेक्स्ट",color:"#1a1a2e",color2:"#3a3a6e",icon:"ℹ️",dur:4}); render();}
 function drawSlide(s){
- ctx.fillStyle=s.color; ctx.fillRect(0,0,cv.width,cv.height);
- ctx.fillStyle="#fff"; ctx.font="bold 38px sans-serif"; ctx.textAlign="center";
- const lines=s.text.split("\n"); const lh=50; const startY=cv.height/2 - (lines.length-1)*lh/2;
- lines.forEach((l,i)=>ctx.fillText(l, cv.width/2, startY+i*lh, cv.width-80));
+ const g=ctx.createLinearGradient(0,0,0,cv.height);
+ g.addColorStop(0,s.color); g.addColorStop(1,s.color2||s.color);
+ ctx.fillStyle=g; ctx.fillRect(0,0,cv.width,cv.height);
+ ctx.strokeStyle="rgba(255,255,255,0.35)"; ctx.lineWidth=6;
+ ctx.strokeRect(18,18,cv.width-36,cv.height-36);
+ if(s.icon){ ctx.font="90px sans-serif"; ctx.textAlign="center"; ctx.fillText(s.icon, cv.width/2, 200); }
+ ctx.fillStyle="#fff"; ctx.font="bold 40px sans-serif"; ctx.textAlign="center";
+ const lines=s.text.split("\n"); const lh=54; const startY=cv.height/2 - (lines.length-1)*lh/2 + 60;
+ lines.forEach((l,i)=>{
+  ctx.shadowColor="rgba(0,0,0,0.6)"; ctx.shadowBlur=8;
+  ctx.fillText(l, cv.width/2, startY+i*lh, cv.width-100);
+ });
+ ctx.shadowBlur=0;
 }
 async function preview(){
- for(const s of slides){ drawSlide(s); await new Promise(r=>setTimeout(r, s.dur*1000)); drawSlide(slides[0]); }
+ for(const s of slides){ drawSlide(s); await new Promise(r=>setTimeout(r, s.dur*1000)); }
 }
 async function exportVideo(){
  const status=document.getElementById('status');
  const stream=cv.captureStream(30);
  let rec, chunks=[];
  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
- try {
-  rec=new MediaRecorder(stream,{mimeType:mime});
- } catch(e) {
-  status.textContent="Error: Browser video recording not supported."; return;
- }
+ rec=new MediaRecorder(stream,{mimeType:mime});
  rec.ondataavailable=e=>chunks.push(e.data);
  rec.onstop=()=>{
   const blob=new Blob(chunks,{type:mime});
   const url=URL.createObjectURL(blob);
   const a=document.getElementById('dl');
-  a.href=url; a.download="disclaimer-video.webm"; a.style.display="block";
-  status.textContent="✅ वीडियो तैयार है! नीचे डाउनलोड लिंक दबाएं।";
+  a.href=url; a.download="disclaimer-video.webm"; a.style.display="inline-block"; a.textContent="⬇ वीडियो डाउनलोड करें (.webm)";
+  status.textContent="तैयार है! नीचे डाउनलोड लिंक दबाएं। (इसमें आवाज़ नहीं है — CapCut/VN में आवाज़+म्यूज़िक जोड़ें)";
  };
  rec.start();
- status.textContent="⏳ वीडियो बन रहा है, कृपया इंतज़ार करें...";
+ status.textContent="बन रहा है...";
  for(const s of slides){ drawSlide(s); await new Promise(r=>setTimeout(r, s.dur*1000)); }
  rec.stop();
 }
