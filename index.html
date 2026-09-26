@@ -29,7 +29,7 @@ a#dl{display:none;margin-top:10px;}
 </style>
 </head>
 <body>
-<h1>⚖️ डिस्क्लेमर वीडियो जेनरेटर</h1>
+<h1>⚖️ डिस्क्लेमर वीडियो जेनरेटर (एनिमेशन सहित)</h1>
 <div class="wrap">
 <canvas id="cv" width="720" height="1280"></canvas>
 <div id="status"></div>
@@ -67,24 +67,47 @@ function render(){
  });
 }
 function addSlide(){slides.push({text:"नया टेक्स्ट",color:"#1a1a2e",color2:"#3a3a6e",icon:"ℹ️",dur:4}); render();}
-function drawSlide(s){
+
+function ease(t){return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
+function drawSlide(s,p){
+ p = p===undefined?1:p;
+ const FADE=0.15;
+ let alpha=1, slideOff=0, iconScale=1;
+ if(p<FADE){ const t=ease(p/FADE); alpha=t; slideOff=(1-t)*60; iconScale=0.6+0.4*t; }
+ else if(p>1-FADE){ const t=ease((1-p)/FADE); alpha=t; }
  const g=ctx.createLinearGradient(0,0,0,cv.height);
  g.addColorStop(0,s.color); g.addColorStop(1,s.color2||s.color);
  ctx.fillStyle=g; ctx.fillRect(0,0,cv.width,cv.height);
  ctx.strokeStyle="rgba(255,255,255,0.35)"; ctx.lineWidth=6;
  ctx.strokeRect(18,18,cv.width-36,cv.height-36);
- if(s.icon){ ctx.font="90px sans-serif"; ctx.textAlign="center"; ctx.fillText(s.icon, cv.width/2, 200); }
+ ctx.globalAlpha=alpha;
+ if(s.icon){
+  ctx.save();
+  ctx.translate(cv.width/2,200);
+  ctx.scale(iconScale,iconScale);
+  ctx.font="90px sans-serif"; ctx.textAlign="center"; ctx.fillText(s.icon,0,0);
+  ctx.restore();
+ }
  ctx.fillStyle="#fff"; ctx.font="bold 40px sans-serif"; ctx.textAlign="center";
  const lines=s.text.split("\n"); const lh=54; const startY=cv.height/2 - (lines.length-1)*lh/2 + 60;
  lines.forEach((l,i)=>{
   ctx.shadowColor="rgba(0,0,0,0.6)"; ctx.shadowBlur=8;
-  ctx.fillText(l, cv.width/2, startY+i*lh, cv.width-100);
+  ctx.fillText(l, cv.width/2, startY+i*lh+slideOff, cv.width-100);
  });
- ctx.shadowBlur=0;
+ ctx.shadowBlur=0; ctx.globalAlpha=1;
 }
-async function preview(){
- for(const s of slides){ drawSlide(s); await new Promise(r=>setTimeout(r, s.dur*1000)); }
+async function playAll(onFrame){
+ const fps=30;
+ for(const s of slides){
+  const totalFrames=Math.round(s.dur*fps);
+  for(let f=0; f<totalFrames; f++){
+   drawSlide(s, f/totalFrames);
+   if(onFrame) await onFrame();
+   else await new Promise(r=>setTimeout(r,1000/fps));
+  }
+ }
 }
+async function preview(){ await playAll(); }
 async function exportVideo(){
  const status=document.getElementById('status');
  const stream=cv.captureStream(30);
@@ -101,10 +124,10 @@ async function exportVideo(){
  };
  rec.start();
  status.textContent="बन रहा है...";
- for(const s of slides){ drawSlide(s); await new Promise(r=>setTimeout(r, s.dur*1000)); }
+ await playAll(()=>new Promise(r=>setTimeout(r,1000/30)));
  rec.stop();
 }
-render(); drawSlide(slides[0]);
+render(); drawSlide(slides[0],1);
 </script>
 </body>
 </html>
