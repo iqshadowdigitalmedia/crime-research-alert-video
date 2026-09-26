@@ -151,14 +151,16 @@ async function exportVideo(){
  const status=document.getElementById('status');
  const stream=cv.captureStream(30);
  let rec, chunks=[];
- const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+ const candidates=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'];
+ const mime = candidates.find(m=>MediaRecorder.isTypeSupported(m)) || 'video/webm';
+ const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
  rec=new MediaRecorder(stream,{mimeType:mime});
  rec.ondataavailable=e=>chunks.push(e.data);
  rec.onstop=()=>{
   const blob=new Blob(chunks,{type:mime});
   const url=URL.createObjectURL(blob);
   const a=document.getElementById('dl');
-  a.href=url; a.download="disclaimer-video.webm"; a.style.display="inline-block"; a.textContent="⬇ वीडियो डाउनलोड करें (.webm)";
+  a.href=url; a.download="disclaimer-video."+ext; a.style.display="inline-block"; a.textContent="⬇ वीडियो डाउनलोड करें (."+ext+")";
   status.textContent="तैयार है! नीचे डाउनलोड लिंक दबाएं। (इसमें आवाज़ नहीं है — CapCut/VN में आवाज़+म्यूज़िक जोड़ें)";
  };
  rec.start();
