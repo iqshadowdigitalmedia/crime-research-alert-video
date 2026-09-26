@@ -90,7 +90,6 @@ function drawSlide(s,p){
  const FADE=0.15;
  let alpha=1, slideOff=0, iconScale=1;
  if(p<FADE){ const t=ease(p/FADE); alpha=t; slideOff=(1-t)*60; iconScale=0.6+0.4*t; }
- else if(p>1-FADE){ const t=ease((1-p)/FADE); alpha=t; }
  const g=ctx.createLinearGradient(0,0,0,cv.height);
  g.addColorStop(0,s.color); g.addColorStop(1,s.color2||s.color);
  ctx.fillStyle=g; ctx.fillRect(0,0,cv.width,cv.height);
