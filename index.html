@@ -2,172 +2,209 @@
 <html lang="hi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>डिस्क्लेमर वीडियो</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NCRIB Foundation Review | Hindi Video</title>
 <style>
-:root{--bg:#0f1115;--card:#1a1d24;--accent:#4f7cff;--text:#eee;--muted:#9aa1ad;}
-@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f4f5f7;--card:#fff;--text:#111;--muted:#666;}}
-*{box-sizing:border-box;}
-body{margin:0;background:var(--bg);color:var(--text);font-family:sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
-h1{font-size:1.2rem;padding:16px;margin:0;}
-.wrap{max-width:480px;margin:0 auto;padding:0 12px 40px;}
-canvas{width:100%;border-radius:10px;background:#000;display:block;}
-.slide{background:var(--card);border-radius:10px;padding:10px;margin:10px 0;}
-.slide textarea{width:100%;min-height:70px;background:transparent;color:var(--text);border:1px solid #444;border-radius:6px;padding:8px;font-size:14px;}
-.row{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;}
-.row2{display:flex;gap:8px;align-items:center;margin-top:6px;}
-.row2 input[type=text]{width:60px;padding:4px;border-radius:4px;border:1px solid #444;background:transparent;color:var(--text);text-align:center;font-size:20px;}
-input[type=color]{width:36px;height:30px;border:none;background:none;}
-input[type=number]{width:60px;padding:4px;}
-button{background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:14px;}
-button.secondary{background:#333;}
-button.del{background:#a33;}
-button.sticker{background:#2a2d36;padding:6px 8px;font-size:16px;}
-.controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;}
-label{font-size:12px;color:var(--muted);}
-#status{font-size:13px;color:var(--muted);margin-top:8px;}
-a#dl{display:none;margin-top:10px;}
+*{box-sizing:border-box}
+body{margin:0;background:#06111f;color:#f5f7fb;font-family:Arial,"Noto Sans Devanagari",sans-serif}
+.stage{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:70px 22px 85px;background:radial-gradient(ellipse at top right,#16445a,transparent 50%),linear-gradient(140deg,#06111f,#102339)}
+.scene{width:min(100%,1000px);animation:show .6s ease}
+.kicker{color:#5eead4;font-size:14px;font-weight:bold;letter-spacing:2px}
+h1{font-size:clamp(36px,6vw,70px);line-height:1.12;margin:22px 0}
+h2{font-size:clamp(24px,4vw,42px);color:#5eead4;line-height:1.25}
+p,li{font-size:clamp(18px,2.2vw,25px);line-height:1.65;color:#d1deeb}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:24px}
+.card{padding:22px;border:1px solid #31516a;border-radius:16px;background:#10243a}
+.card b{display:block;color:#5eead4;font-size:22px;margin-bottom:10px}
+.card span{font-size:18px;line-height:1.55;color:#d1deeb}
+.note{margin-top:22px;padding:16px;border-left:4px solid #fbbf24;background:#2b271a;line-height:1.6;color:#ffedbb}
+.tags span{display:inline-block;border:1px solid #49657c;border-radius:30px;padding:8px 12px;margin:5px}
+.sources a{display:block;color:#5eead4;overflow-wrap:anywhere;margin:12px 0}
+.controls{position:fixed;top:12px;right:12px;display:flex;gap:6px;flex-wrap:wrap;z-index:5}
+button{background:#15314b;color:white;border:1px solid #53718a;border-radius:9px;padding:10px;cursor:pointer}
+.bottom{position:fixed;bottom:0;left:0;right:0;background:#06111f;padding:12px 18px;display:flex;gap:12px;align-items:center}
+.track{height:5px;background:#24384c;flex:1;border-radius:10px;overflow:hidden}
+#bar{height:100%;width:0;background:#5eead4}
+#count{font-size:13px;color:#d1deeb}
+@keyframes show{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+@media(max-width:600px){.cards{grid-template-columns:1fr}.card{padding:15px}.controls{left:8px;right:8px;justify-content:center}.stage{padding-top:90px}.card b{font-size:20px}}
 </style>
 </head>
 <body>
-<h1>⚖️ डिस्क्लेमर वीडियो जेनरेटर (एनिमेशन सहित)</h1>
-<div class="wrap">
-<canvas id="cv" width="720" height="1280"></canvas>
-<div id="status"></div>
 <div class="controls">
-<button onclick="preview()">▶ प्रीव्यू</button>
-<button class="secondary" onclick="addSlide()">+ नई स्लाइड</button>
-<button onclick="exportVideo()">⬇ वीडियो बनाएं</button>
+<button id="prev">◀ पीछे</button>
+<button id="play">⏸ रोकें</button>
+<button id="next">आगे ▶</button>
+<button id="restart">↻ शुरू</button>
 </div>
-<a id="dl">वीडियो डाउनलोड करें</a>
-<div id="slides"></div>
-</div>
+<main class="stage"><section id="scene" class="scene"></section></main>
+<div class="bottom"><div class="track"><div id="bar"></div></div><span id="count">1/10</span></div>
+
 <script>
-let slides = [
- {text:"डिस्क्लेमर:\nइस चैनल पर साझा की गई जानकारी निर्माता के व्यक्तिगत शोध, सार्वजनिक रूप से उपलब्ध जानकारी और जनहित में जागरूकता फैलाने के उद्देश्य पर आधारित है।", color:"#0a0c12", color2:"#1a1a2e", icon:"⚖️", dur:7},
- {text:"इस चैनल का उद्देश्य किसी भी व्यक्ति, संस्था या संगठन को बदनाम करना अथवा नुकसान पहुँचाना नहीं है।\nदर्शकों से अनुरोध है कि किसी भी संस्था से जुड़ने या भुगतान करने से पहले स्वयं जाँच-पड़ताल अवश्य करें।", color:"#1a1a2e", color2:"#2e1a1a", icon:"ℹ️", dur:8},
- {text:"ठगी हो जाए तो तुरंत\n📞 1930 पर कॉल करें\nया cybercrime.gov.in पर शिकायत दर्ज करें", color:"#0e3a1f", color2:"#1a2e1a", icon:"✅", dur:6},
- {text:"उपयोगी लगे तो चैनल को Subscribe करें\nऔर अपनों के साथ Share करें!", color:"#1a2e5a", color2:"#2e1a5a", icon:"🔔", dur:5}
-];
-const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
-function render(){
- const box=document.getElementById('slides'); box.innerHTML='';
- slides.forEach((s,i)=>{
-  const d=document.createElement('div'); d.className='slide';
-  d.innerHTML=`<textarea onchange="slides[${i}].text=this.value">${s.text}</textarea>
-  <div class="row">
-   <label>रंग 1</label><input type="color" value="${s.color}" onchange="slides[${i}].color=this.value">
-   <label>रंग 2</label><input type="color" value="${s.color2||s.color}" onchange="slides[${i}].color2=this.value">
-   <label>सेकंड</label><input type="number" value="${s.dur}" min="1" max="15" onchange="slides[${i}].dur=+this.value">
-  </div>
-  <div class="row2">
-   <label>आइकन</label><input type="text" maxlength="2" value="${s.icon||''}" onchange="slides[${i}].icon=this.value">
-   <button class="del" onclick="slides.splice(${i},1);render()">हटाएं</button>
-  </div>
-  <div class="row" style="margin-top:8px">
-   <label>Elements:</label>
-   ${['🔒','⚠️','🛡️','📞','✅','❌','💰','📱','👮','🚫'].map(e=>`<button class="sticker" onclick="addSticker(${i},'${e}')">${e}</button>`).join('')}
-  </div>
-  <div class="row" style="flex-wrap:wrap;gap:4px;margin-top:4px">
-   ${(s.stickers||[]).map((st,si)=>`<span style="background:#333;padding:2px 6px;border-radius:6px;font-size:13px">${st.e}<button style="padding:0 4px;margin-left:4px;background:#a33;border-radius:4px" onclick="slides[${i}].stickers.splice(${si},1);render()">x</button></span>`).join('')}
-  </div>`;
-  box.appendChild(d);
- });
+const ARTICLE="https://researchcrimeawareness.blogspot.com/2026/09/ncrib-foundation-review.html";
+
+const scenes=[
+{
+time:15,k:"PUBLIC INFORMATION REPORT",
+title:"NCRIB Foundation Review",
+sub:"दावों को नहीं, प्रमाणों को परखें",
+body:"इस वीडियो में संस्था से संबंधित सार्वजनिक जानकारी, वेबसाइट पर किए गए दावे और स्वतंत्र सत्यापन के तरीकों को समझाया गया है। उद्देश्य जागरूकता है, किसी व्यक्ति या संस्था के विरुद्ध अप्रमाणित आरोप लगाना नहीं।",
+tags:["हिंदी एक्सप्लेनर","Public records","Fact checking"]
+},
+{
+time:17,k:"01 — परिचय",
+title:"यह समीक्षा क्यों जरूरी है?",
+sub:"रजिस्ट्रेशन, वेबसाइट और अधिकार अलग-अलग बातें हैं",
+cards:[
+["रजिस्ट्रेशन","कानूनी इकाई का विवरण आधिकारिक रिकॉर्ड से जाँचें।"],
+["वेबसाइट","वेबसाइट पर लिखा दावा अपने-आप स्वतंत्र प्रमाण नहीं है।"],
+["सत्यापन","दस्तावेज़, तारीख और मूल स्रोत को आपस में मिलाएँ।"]
+]
+},
+{
+time:20,k:"02 — कंपनी रिकॉर्ड",
+title:"आधिकारिक रिकॉर्ड की जाँच करें",
+sub:"कंपनी की पहचान के लिए MCA पोर्टल देखें",
+cards:[
+["कानूनी नाम","कंपनी का नाम और CIN मूल रिकॉर्ड से मिलाएँ।"],
+["स्थिति","वर्तमान कंपनी स्थिति और incorporation date जाँचें।"],
+["निदेशक","निदेशकों और पते में हुए बदलाव देखें।"],
+["दस्तावेज़","रिकॉर्ड की तारीख और डाउनलोड किए गए प्रमाण सुरक्षित रखें।"]
+],
+note:"प्रकाशित करने से पहले सभी कंपनी विवरण Ministry of Corporate Affairs के मूल रिकॉर्ड से सत्यापित करें।"
+},
+{
+time:18,k:"03 — स्रोतों की जाँच",
+title:"हर स्रोत की अपनी सीमा है",
+cards:[
+["आधिकारिक रिकॉर्ड","कानूनी विवरण के सत्यापन में उपयोगी।"],
+["संस्था की वेबसाइट","संस्था के अपने दावे और घोषणाएँ दिखाती है।"],
+["वेबसाइट आर्काइव","किसी तारीख पर सुरक्षित किए गए पेज की झलक दिखाता है।"],
+["सावधानी","एक स्क्रीनशॉट से मालिकाना हक या गलत काम साबित नहीं होता।"]
+]
+},
+{
+time:18,k:"04 — NGO Darpan",
+title:"लिस्टिंग का अर्थ समझें",
+sub:"पोर्टल पर विवरण स्वयं सत्यापित करें",
+body:"NGO Darpan पर दर्ज होना अपने-आप किसी संस्था को सरकारी विभाग, पुलिस इकाई या जाँच एजेंसी नहीं बनाता। किसी विशेष अधिकार के दावे की पुष्टि संबंधित कानून, सरकारी आदेश या आधिकारिक अधिसूचना से करें।",
+note:"पोर्टल पर उपलब्ध रिकॉर्ड और किसी संस्था द्वारा किए गए दावों को अलग-अलग प्रस्तुत करें।"
+},
+{
+time:20,k:"05 — भर्ती और अवसर",
+title:"Vacancy के दावे कैसे जाँचें?",
+cards:[
+["नियोक्ता","कौन नियुक्त कर रहा है और कानूनी जिम्मेदारी किसकी है?"],
+["वेतन और काम","वेतन, स्थान, काम और अवधि लिखित में माँगें।"],
+["आधिकारिक आदेश","भर्ती विज्ञापन या अधिकृत आदेश सत्यापित करें।"],
+["भुगतान","भर्ती शुल्क या डिपॉजिट की माँग पर सावधानी बरतें।"]
+],
+note:"वेबसाइट पर प्रकाशित भर्ती संख्या को स्वतंत्र पुष्टि के बिना सत्यापित रिक्तियों की संख्या न बताएँ।"
+},
+{
+time:18,k:"06 — वेबसाइट इतिहास",
+title:"पुराने snapshots क्या बताते हैं?",
+sub:"तारीख और URL के साथ तुलना करें",
+body:"Wayback Machine के snapshots अलग-अलग समय पर उपलब्ध वेबसाइट सामग्री दिखा सकते हैं। पेज की सामग्री, URL और capture date को नोट करें। किसी तारीख का snapshot न मिलना अपने-आप यह साबित नहीं करता कि उस समय वेबसाइट मौजूद नहीं थी।",
+note:"वेबसाइट के इतिहास के बारे में निष्कर्ष केवल उपलब्ध प्रमाणों की सीमा में रखें।"
+},
+{
+time:18,k:"07 — संबंधित संस्थाएँ",
+title:"साझा विवरण का अर्थ क्या है?",
+sub:"संबंध का तथ्य और आरोप अलग बातें हैं",
+body:"दो संस्थाओं में समान निदेशक, पता या संपर्क विवरण दिखाई दे तो उस तथ्य को मूल रिकॉर्ड के साथ बताया जा सकता है। केवल समान विवरण से धोखाधड़ी, मिलीभगत या गैरकानूनी गतिविधि का निष्कर्ष नहीं निकलता।",
+cards:[
+["क्या दिखाएँ?","रिकॉर्ड में दर्ज वास्तविक विवरण।"],
+["क्या न मानें?","बिना प्रमाण किसी गलत काम का निष्कर्ष।"]
+]
+},
+{
+time:20,k:"08 — आपकी जाँच सूची",
+title:"आवेदन करने से पहले",
+list:[
+"आधिकारिक पोर्टल पर कानूनी नाम जाँचें।",
+"CIN या NGO विवरण मूल रिकॉर्ड से मिलाएँ।",
+"नियोक्ता और भर्ती आदेश की पुष्टि करें।",
+"वेतन, काम और स्थान लिखित में लें।",
+"शुल्क या डिपॉजिट की माँग पर सावधानी रखें।",
+"दस्तावेज़, ईमेल और रसीदें सुरक्षित रखें।"
+]
+},
+{
+time:20,k:"09 — स्रोत और निष्कर्ष",
+title:"सवाल पूछें। प्रमाण माँगें।",
+sub:"अंतिम निष्कर्ष मूल दस्तावेज़ों पर आधारित हो",
+body:"यह वीडियो सार्वजनिक जानकारी समझने और स्वतंत्र सत्यापन के लिए है। इसे किसी संस्था या व्यक्ति के विरुद्ध अंतिम निर्णय न मानें। नए प्रमाण मिलने पर जानकारी को अपडेट करें।",
+sources:[
+["पूरा समीक्षा लेख",ARTICLE],
+["MCA आधिकारिक वेबसाइट","https://www.mca.gov.in/"],
+["NGO Darpan","https://ngodarpan.gov.in/"],
+["Wayback Machine","https://web.archive.org/"]
+]
 }
-function addSlide(){slides.push({text:"नया टेक्स्ट",color:"#1a1a2e",color2:"#3a3a6e",icon:"ℹ️",dur:4,stickers:[]}); render();}
-function addSticker(i,e){
- if(!slides[i].stickers) slides[i].stickers=[];
- if(slides[i].stickers.length>=6){ alert("ज़्यादा से ज़्यादा 6 elements"); return; }
- const positions=[[0.15,0.12],[0.85,0.12],[0.15,0.88],[0.85,0.88],[0.15,0.5],[0.85,0.5]];
- const pos=positions[slides[i].stickers.length];
- slides[i].stickers.push({e, x:pos[0], y:pos[1]});
- render();
+];
+
+let index=0,elapsed=0,playing=true,last=performance.now();
+const scene=document.getElementById("scene");
+const bar=document.getElementById("bar");
+const count=document.getElementById("count");
+const playButton=document.getElementById("play");
+
+function safe(s){
+return String(s??"").replace(/[&<>"']/g,c=>({
+"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[c]));
 }
 
-function ease(t){return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
-function drawSlide(s,p){
- p = p===undefined?1:p;
- const FADE=0.15;
- let alpha=1, slideOff=0, iconScale=1;
- if(p<FADE){ const t=ease(p/FADE); alpha=t; slideOff=(1-t)*60; iconScale=0.6+0.4*t; }
- const g=ctx.createLinearGradient(0,0,0,cv.height);
- g.addColorStop(0,s.color); g.addColorStop(1,s.color2||s.color);
- ctx.fillStyle=g; ctx.fillRect(0,0,cv.width,cv.height);
- ctx.strokeStyle="rgba(255,255,255,0.35)"; ctx.lineWidth=6;
- ctx.strokeRect(18,18,cv.width-36,cv.height-36);
- ctx.globalAlpha=alpha;
- if(s.icon){
-  ctx.save();
-  ctx.translate(cv.width/2,200);
-  ctx.scale(iconScale,iconScale);
-  ctx.font="90px sans-serif"; ctx.textAlign="center"; ctx.fillText(s.icon,0,0);
-  ctx.restore();
- }
- if(s.stickers){
-  ctx.font="54px sans-serif"; ctx.textAlign="center";
-  s.stickers.forEach(st=>{
-   ctx.save();
-   ctx.globalAlpha=alpha*0.85;
-   ctx.translate(st.x*cv.width, st.y*cv.height);
-   ctx.scale(iconScale,iconScale);
-   ctx.fillText(st.e,0,0);
-   ctx.restore();
-  });
-  ctx.globalAlpha=alpha;
- }
- ctx.fillStyle="#fff"; ctx.font="bold 40px sans-serif"; ctx.textAlign="center";
- const maxW=cv.width-100;
- let lines=[];
- s.text.split("\n").forEach(para=>{
-  const words=para.split(" "); let cur="";
-  words.forEach(w=>{
-   const test=cur?cur+" "+w:w;
-   if(ctx.measureText(test).width>maxW && cur){ lines.push(cur); cur=w; }
-   else cur=test;
-  });
-  lines.push(cur);
- });
- const lh=54; const startY=cv.height/2 - (lines.length-1)*lh/2 + 60;
- lines.forEach((l,i)=>{
-  ctx.shadowColor="rgba(0,0,0,0.6)"; ctx.shadowBlur=8;
-  ctx.fillText(l, cv.width/2, startY+i*lh+slideOff, maxW);
- });
- ctx.shadowBlur=0; ctx.globalAlpha=1;
+function render(){
+const s=scenes[index];
+let html=`<div class="kicker">${safe(s.k)}</div>
+<h1>${safe(s.title)}</h1>`;
+if(s.sub)html+=`<h2>${safe(s.sub)}</h2>`;
+if(s.body)html+=`<p>${safe(s.body)}</p>`;
+if(s.cards)html+=`<div class="cards">${s.cards.map(c=>
+`<div class="card"><b>${safe(c[0])}</b><span>${safe(c[1])}</span></div>`
+).join("")}</div>`;
+if(s.tags)html+=`<div class="tags">${s.tags.map(t=>`<span>${safe(t)}</span>`).join("")}</div>`;
+if(s.list)html+=`<ol>${s.list.map(x=>`<li>${safe(x)}</li>`).join("")}</ol>`;
+if(s.note)html+=`<div class="note">${safe(s.note)}</div>`;
+if(s.sources)html+=`<div class="sources"><h2>स्रोत</h2>${s.sources.map(x=>
+`<a href="${safe(x[1])}" target="_blank" rel="noopener">${safe(x[0])} ↗</a>`
+).join("")}</div>`;
+scene.innerHTML=html;
+scene.style.animation="none";
+void scene.offsetWidth;
+scene.style.animation="show .6s ease";
+elapsed=0;
+count.textContent=`${index+1}/${scenes.length}`;
+bar.style.width="0%";
 }
-async function playAll(onFrame){
- const fps=30;
- for(const s of slides){
-  const totalFrames=Math.round(s.dur*fps);
-  for(let f=0; f<totalFrames; f++){
-   drawSlide(s, f/totalFrames);
-   if(onFrame) await onFrame();
-   else await new Promise(r=>setTimeout(r,1000/fps));
-  }
- }
+
+function move(n){
+index=(index+n+scenes.length)%scenes.length;
+render();
 }
-async function preview(){ await playAll(); }
-async function exportVideo(){
- const status=document.getElementById('status');
- const stream=cv.captureStream(30);
- let rec, chunks=[];
- const candidates=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'];
- const mime = candidates.find(m=>MediaRecorder.isTypeSupported(m)) || 'video/webm';
- const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
- rec=new MediaRecorder(stream,{mimeType:mime});
- rec.ondataavailable=e=>chunks.push(e.data);
- rec.onstop=()=>{
-  const blob=new Blob(chunks,{type:mime});
-  const url=URL.createObjectURL(blob);
-  const a=document.getElementById('dl');
-  a.href=url; a.download="disclaimer-video."+ext; a.style.display="inline-block"; a.textContent="⬇ वीडियो डाउनलोड करें (."+ext+")";
-  status.textContent="तैयार है! नीचे डाउनलोड लिंक दबाएं। (इसमें आवाज़ नहीं है — CapCut/VN में आवाज़+म्यूज़िक जोड़ें)";
- };
- rec.start();
- status.textContent="बन रहा है...";
- await playAll(()=>new Promise(r=>setTimeout(r,1000/30)));
- rec.stop();
+document.getElementById("prev").onclick=()=>move(-1);
+document.getElementById("next").onclick=()=>move(1);
+document.getElementById("restart").onclick=()=>{index=0;render()};
+playButton.onclick=()=>{
+playing=!playing;
+playButton.textContent=playing?"⏸ रोकें":"▶ चलाएँ";
+last=performance.now();
+};
+
+function tick(now){
+const dt=Math.min((now-last)/1000,.1);
+last=now;
+if(playing){
+elapsed+=dt;
+bar.style.width=Math.min(100,elapsed/scenes[index].time*100)+"%";
+if(elapsed>=scenes[index].time)move(1);
 }
-render(); drawSlide(slides[0],1);
+requestAnimationFrame(tick);
+}
+render();
+requestAnimationFrame(tick);
 </script>
 </body>
 </html>
