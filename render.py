@@ -1,21 +1,17 @@
 import asyncio
 import os
-import math
 import subprocess
 import edge_tts
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 # ---------------------------------------------------------
-# Configuration for Horizontal 16:9 (1920x1080) Video
+# Configuration
 # ---------------------------------------------------------
 VOICE = "hi-IN-MadhurNeural"  # Serious Male Voice
 AUDIO_PATH = "voiceover.mp3"
-INPUT_BG = "background.jpg"   # Your poster image
+INPUT_BG = "background.jpg"   # Poster image
+PROCESSED_FRAME = "base_frame.png"
 OUTPUT_PATH = "output/ncrib-awareness-horizontal.mp4"
-FRAMES_DIR = "frames"
-
-# Scrolling Ticker Text
-TICKER_TEXT = " ⚠️ FRAUD PREVENTION • SCAM ALERT • CORRUPTION WARNING • CYBERSECURITY PROTECTION • VERIFY BEFORE TRUSTING ⚠️ "
 
 # ---------------------------------------------------------
 # 1. Read Script from article.txt
@@ -33,79 +29,24 @@ def get_script_text():
     """
 
 # ---------------------------------------------------------
-# 2. Generate Serious Voiceover
+# 2. Serious Voiceover Generator
 # ---------------------------------------------------------
 async def generate_voice(script_text):
     communicate = edge_tts.Communicate(script_text, VOICE, rate="-8%", pitch="+0Hz")
     await communicate.save(AUDIO_PATH)
 
 # ---------------------------------------------------------
-# 3. Get Audio Duration using FFmpeg
+# 3. Base Image Resizing to 1920x1080
 # ---------------------------------------------------------
-def get_audio_duration(file_path):
-    cmd = [
-        "ffprobe", "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
-        file_path
-    ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    return float(result.stdout.strip())
-
-# ---------------------------------------------------------
-# 4. Generate Horizontal (1920x1080) Animated Frames
-# ---------------------------------------------------------
-def generate_animated_frames(duration, fps=25):
-    os.makedirs(FRAMES_DIR, exist_ok=True)
-    total_frames = int(duration * fps)
-    
-    # Base background image resized to Full HD Horizontal (1920x1080)
+def prepare_base_frame():
     if os.path.exists(INPUT_BG):
-        base_img = Image.open(INPUT_BG).convert("RGB").resize((1920, 1080))
+        img = Image.open(INPUT_BG).convert("RGB").resize((1920, 1080))
     else:
-        base_img = Image.new("RGB", (1920, 1080), color=(15, 23, 42))
-
-    print(f"Generating {total_frames} horizontal animated frames...")
-    
-    ticker_x = 0
-    font = ImageFont.load_default()
-
-    for i in range(total_frames):
-        # Continuous slow zoom effect for background
-        zoom_factor = 1.0 + (0.05 * (i / total_frames))
-        w, h = base_img.size
-        crop_w, crop_h = int(w / zoom_factor), int(h / zoom_factor)
-        crop_x, crop_y = (w - crop_w) // 2, (h - crop_h) // 2
-        
-        frame = base_img.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h))
-        frame = frame.resize((1920, 1080))
-        
-        draw = ImageDraw.Draw(frame)
-
-        # Top Warning Header Bar (Horizontal Wide)
-        draw.rectangle([(0, 0), (1920, 60)], fill=(180, 20, 20))
-        draw.text((30, 20), "CYBERSECURITY WARNING & FRAUD PREVENTION ALERT", fill=(255, 255, 255), font=font)
-
-        # Pulsing Alert Indicator Light on Top-Right Corner
-        pulse = int(127 + 127 * math.sin(i * 0.2))
-        draw.ellipse([(1850, 15), (1885, 45)], fill=(255, pulse, pulse))
-
-        # Bottom Scrolling Ticker Banner Animation
-        draw.rectangle([(0, 1020), (1920, 1080)], fill=(0, 0, 0))
-        ticker_x -= 6  # Scrolling speed
-        if abs(ticker_x) > 1500:
-            ticker_x = 0
-            
-        draw.text((ticker_x, 1040), TICKER_TEXT * 4, fill=(255, 215, 0), font=font)
-
-        # Save each frame
-        frame_filename = os.path.join(FRAMES_DIR, f"frame_{i:04d}.png")
-        frame.save(frame_filename)
-
-    return total_frames
+        img = Image.new("RGB", (1920, 1080), color=(15, 23, 42))
+    img.save(PROCESSED_FRAME)
 
 # ---------------------------------------------------------
-# 5. Build Final Horizontal MP4 Video via FFmpeg
+# 4. Fast Direct FFmpeg Filter Engine
 # ---------------------------------------------------------
 def build_video():
     script_text = get_script_text()
@@ -114,19 +55,30 @@ def build_video():
     print("Generating Serious Hindi Voiceover...")
     asyncio.run(generate_voice(script_text))
     
-    duration = get_audio_duration(AUDIO_PATH)
-    print(f"Audio Duration: {duration:.2f} seconds")
-    
-    generate_animated_frames(duration, fps=25)
+    print("Preparing 1920x1080 Base Frame...")
+    prepare_base_frame()
     
     os.makedirs("output", exist_ok=True)
     
-    print("Combining Frames and Audio into Horizontal MP4...")
+    print("Rendering Animated Video via FFmpeg...")
+    
+    # Smooth Zoom Animation + Red Header + Scrolling Yellow Ticker
+    filter_complex = (
+        "[0:v]zoompan=z='min(zoom+0.0008,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=125:s=1920x1080:fps=25[bg];"
+        "[bg]drawbox=y=0:color=red@0.85:width=iw:height=70:t=fill[topbar];"
+        "[topbar]drawtext=text='CYBERSECURITY WARNING AND FRAUD PREVENTION ALERT':fontcolor=white:fontsize=32:x=40:y=20[header];"
+        "[header]drawbox=y=1010:color=black@0.9:width=iw:height=70:t=fill[bottombar];"
+        "[bottombar]drawtext=text='WARNING: FRAUD PREVENTION - SCAM ALERT - CORRUPTION WARNING - VERIFY DOCUMENTS BEFORE APPLYING':fontcolor=yellow:fontsize=28:x='w-mod(t*180\\,w+1200)':y=1030[outv]"
+    )
+    
     cmd = [
         "ffmpeg", "-y",
-        "-framerate", "25",
-        "-i", f"{FRAMES_DIR}/frame_%04d.png",
+        "-loop", "1",
+        "-i", PROCESSED_FRAME,
         "-i", AUDIO_PATH,
+        "-filter_complex", filter_complex,
+        "-map", "[outv]",
+        "-map", "1:a",
         "-c:v", "libx264",
         "-c:a", "aac",
         "-b:a", "256k",
@@ -136,7 +88,7 @@ def build_video():
     ]
     
     subprocess.run(cmd, check=True)
-    print("Horizontal Long Video Render Completed Successfully!")
+    print("Video Render Completed Successfully!")
 
 if __name__ == "__main__":
     build_video()
