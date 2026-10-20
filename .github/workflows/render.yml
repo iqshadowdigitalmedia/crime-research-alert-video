@@ -23,7 +23,7 @@ jobs:
       - name: Install FFmpeg and fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-noto-core
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-lohit-deva libraqm0 libfribidi0 libharfbuzz0b
 
       - name: Install Python libraries
         run: pip install -r requirements.txt
@@ -37,4 +37,3 @@ jobs:
           name: ncrib-awareness-mp4
           path: output/ncrib-awareness.mp4
           if-no-files-found: error
-          
