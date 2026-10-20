@@ -1,9 +1,10 @@
 import asyncio
 import os
+import subprocess
 import edge_tts
-from moviepy.editor import ImageClip, AudioFileClip, CompositeVideoClip, TextClip
+from PIL import Image, ImageDraw
 
-# 1. गंभीर और स्पष्ट वॉइसओवर (Serious Male Voice)
+# गंभीर और स्पष्ट हिंदी स्क्रिप्ट
 TEXT = """
 सावधान! NCRIB फाउंडेशन और NGO दर्पण जैसे नामों से भ्रमित न हों। 
 सरकारी जैसी दिखने वाली वेबसाइट, वास्तविक सरकारी संस्था नहीं होती। 
@@ -12,42 +13,45 @@ TEXT = """
 
 VOICE = "hi-IN-MadhurNeural"  # सीरियस और क्लियर मेल वॉइस
 AUDIO_PATH = "voiceover.mp3"
+FRAME_PATH = "frame.png"
 OUTPUT_PATH = "output/ncrib-awareness.mp4"
 
 async def generate_voice():
     communicate = edge_tts.Communicate(TEXT, VOICE, rate="+0%")
     await communicate.save(AUDIO_PATH)
 
+def create_base_image():
+    # 1280x720 का पेशेवर डार्क बैकग्राउंड बनाएं
+    img = Image.new("RGB", (1280, 720), color=(15, 23, 42))
+    img.save(FRAME_PATH)
+
 def create_video():
-    # ऑडियो जनरेट करें
+    print("Generating voiceover...")
     asyncio.run(generate_voice())
     
-    # आउटपुट फोल्डर बनाएं
+    print("Creating background frame...")
+    create_base_image()
+    
     os.makedirs("output", exist_ok=True)
     
-    # ऑडियो लोड करें
-    audio = AudioFileClip(AUDIO_PATH)
-    duration = audio.duration
+    print("Rendering MP4 video using FFmpeg...")
+    # FFmpeg के जरिए इमेज और ऑडियो को जोड़कर MP4 बनाना
+    cmd = [
+        "ffmpeg", "-y",
+        "-loop", "1",
+        "-i", FRAME_PATH,
+        "-i", AUDIO_PATH,
+        "-c:v", "libx264",
+        "-tune", "stillimage",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-pix_fmt", "yuv420p",
+        "-shortest",
+        OUTPUT_PATH
+    ]
     
-    # इमेज/बैकग्राउंड लोड करें (अगर इमेज है तो 1000273241.jpg का यूज़ करें)
-    # यहाँ हम बेसिक इमेज/बैकग्राउंड से वीडियो बना रहे हैं
-    if os.path.exists("background.jpg"):
-        clip = ImageClip("background.jpg").set_duration(duration)
-    else:
-        # बैकग्राउंड इमेज न होने पर डिफ़ॉल्ट क्लिप
-        from moviepy.editor import ColorClip
-        clip = ColorClip(size=(1280, 720), color=(15, 23, 42)).set_duration(duration)
-
-    # ऑडियो अटैच करें
-    final_clip = clip.set_audio(audio)
-    
-    # MP4 सेव करें
-    final_clip.write_videofile(
-        OUTPUT_PATH,
-        fps=24,
-        codec="libx264",
-        audio_codec="aac"
-    )
+    subprocess.run(cmd, check=True)
+    print("Video rendered successfully!")
 
 if __name__ == "__main__":
     create_video()
