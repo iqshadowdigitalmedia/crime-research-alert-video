@@ -8,36 +8,89 @@ import subprocess
 from functools import lru_cache
 
 import edge_tts
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 W, H, FPS = 1280, 720, 12
 VOICE = "hi-IN-MadhurNeural"   # पुरुष की हिंदी आवाज़
 RATE = "-8%"                   # धीमी और साफ़ आवाज़ (और धीमा करना हो तो "-15%")
 PAD = 0.6                      # हर स्लाइड के बाद रुकने का समय
 CHUNK = 140                    # एक स्लाइड में अधिकतम अक्षर
-FOOTER = "साइबर जागरूकता • सतर्क रहें • सुरक्षित रहें"
+BRAND = "IQ SHADOW DIGITAL MEDIA"          # ऊपर का नाम-टैग (बदल सकते हैं)
+FOOTER_PARTS = ["साइबर जागरूकता", "सतर्क रहें", "सुरक्षित रहें"]
+OUTRO_TITLE = "धन्यवाद"
+OUTRO_SPEECH = "देखने के लिए धन्यवाद। जागरूक रहें, सतर्क रहें, सुरक्षित रहें।"  # खाली "" करने पर अंत की स्लाइड नहीं बनेगी
+ACCENT = (255, 193, 7)
 OUT_DIR, TMP = "output", "tmp"
+BW, BH = int(W * 1.12), int(H * 1.12)      # पैन के लिए थोड़ा बड़ा बैकग्राउंड
+SPW, SPH = 300, 375                        # प्रेज़ेंटर का आकार
 
 
+# ---------------- फ़ॉन्ट और टेक्स्ट ----------------
 @lru_cache(maxsize=None)
-def load_font(size, bold=False):
-    name = "NotoSansDevanagari-Bold.ttf" if bold else "NotoSansDevanagari-Regular.ttf"
-    paths = glob.glob(f"/usr/share/fonts/**/{name}", recursive=True)
-    paths += glob.glob("/usr/share/fonts/**/NotoSansDevanagari*.ttf", recursive=True)
-    paths += glob.glob("/usr/share/fonts/**/*Devanagari*.ttf", recursive=True)
-    if not paths:
-        raise SystemExit("देवनागरी फ़ॉन्ट नहीं मिला")
-    try:
-        return ImageFont.truetype(paths[0], size, layout_engine=ImageFont.Layout.RAQM)
-    except Exception:
-        return ImageFont.truetype(paths[0], size)
+def get_font(size, bold, dev):
+    if dev:
+        names = ["NotoSansDevanagari-Bold.ttf" if bold else "NotoSansDevanagari-Regular.ttf",
+                 "NotoSansDevanagari*.ttf", "*Devanagari*.ttf"]
+    else:
+        names = ["NotoSans-Bold.ttf" if bold else "NotoSans-Regular.ttf",
+                 "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"]
+    path = None
+    for n in names:
+        found = glob.glob(f"/usr/share/fonts/**/{n}", recursive=True)
+        if found:
+            path = found[0]
+            break
+    if not path:
+        if dev:
+            raise SystemExit("देवनागरी फ़ॉन्ट नहीं मिला")
+        return get_font(size, bold, True)
+    if dev:
+        try:
+            return ImageFont.truetype(path, size, layout_engine=ImageFont.Layout.RAQM)
+        except Exception:
+            pass
+    return ImageFont.truetype(path, size)
 
 
-def wrap(draw, text, font, max_w):
+def is_dev(ch):
+    return "\u0900" <= ch <= "\u097f" or ch in "\u200c\u200d\u25cc"
+
+
+def split_runs(text):
+    runs, cur, cur_dev = [], "", None
+    for ch in text:
+        if ch == " ":
+            cur += ch
+            continue
+        dev = is_dev(ch)
+        if cur_dev is None:
+            cur_dev = dev
+        if dev != cur_dev:
+            runs.append((cur, cur_dev))
+            cur, cur_dev = "", dev
+        cur += ch
+    if cur:
+        runs.append((cur, True if cur_dev is None else cur_dev))
+    return runs
+
+
+def tw(d, text, size, bold=False):
+    return sum(d.textlength(t, font=get_font(size, bold, dev)) for t, dev in split_runs(text))
+
+
+def draw_text(d, x, y, text, size, fill, bold=False):
+    base = y + int(size * 0.95)
+    for t, dev in split_runs(text):
+        f = get_font(size, bold, dev)
+        d.text((x, base), t, font=f, fill=fill, anchor="ls")
+        x += d.textlength(t, font=f)
+
+
+def wrap(d, text, size, bold, max_w):
     lines, cur = [], ""
     for word in text.split():
         test = (cur + " " + word).strip()
-        if draw.textlength(test, font=font) <= max_w:
+        if tw(d, test, size, bold) <= max_w:
             cur = test
         else:
             if cur:
@@ -48,6 +101,7 @@ def wrap(draw, text, font, max_w):
     return lines
 
 
+# ---------------- आर्टिकल ----------------
 def read_article():
     with open("article.txt", encoding="utf-8") as f:
         lines = [l.strip() for l in f.read().splitlines() if l.strip()]
@@ -84,29 +138,23 @@ def make_chunks(text):
     return chunks
 
 
-def cover(im):
-    s = max(W / im.width, H / im.height)
-    im = im.resize((int(im.width * s) + 1, int(im.height * s) + 1))
-    x, y = (im.width - W) // 2, (im.height - H) // 2
-    return im.crop((x, y, x + W, y + H))
+# ---------------- बैकग्राउंड ----------------
+def cover(im, w, h):
+    s = max(w / im.width, h / im.height)
+    im = im.resize((int(im.width * s) + 1, int(im.height * s) + 1), Image.LANCZOS)
+    x, y = (im.width - w) // 2, (im.height - h) // 2
+    return im.crop((x, y, x + w, y + h))
 
 
-def load_backgrounds():
-    exts = (".jpg", ".jpeg", ".png", ".webp")
-    files = []
-    for folder in (".", "images"):
-        if os.path.isdir(folder):
-            for name in sorted(os.listdir(folder)):
-                if name.lower().endswith(exts):
-                    files.append(os.path.join(folder, name))
-    black = Image.new("RGB", (W, H), (0, 0, 0))
-    bgs = []
-    for f in files:
-        try:
-            bgs.append(Image.blend(cover(Image.open(f).convert("RGB")), black, 0.45))
-        except Exception as e:
-            print("तस्वीर छोड़ी:", f, e)
-    return bgs
+def vignette_mask():
+    m = Image.new("L", (BW, BH), 0)
+    ImageDraw.Draw(m).rectangle((100, 80, BW - 100, BH - 80), fill=255)
+    return m.filter(ImageFilter.GaussianBlur(120))
+
+
+def finish(im, mask):
+    im = Image.blend(im, Image.new("RGB", im.size, (4, 14, 38)), 0.4)
+    return Image.composite(im, Image.new("RGB", im.size, (0, 0, 0)), mask)
 
 
 def cyber_bg(seed):
@@ -132,38 +180,162 @@ def cyber_bg(seed):
     return bg
 
 
-def text_layer(title, body):
+def load_backgrounds():
+    mask = vignette_mask()
+    exts = (".jpg", ".jpeg", ".png", ".webp")
+    files = []
+    for folder in (".", "images"):
+        if os.path.isdir(folder):
+            for name in sorted(os.listdir(folder)):
+                if name.lower().endswith(exts):
+                    files.append(os.path.join(folder, name))
+    bigs = []
+    for f in files:
+        try:
+            bigs.append(finish(cover(Image.open(f).convert("RGB"), BW, BH), mask))
+        except Exception as e:
+            print("तस्वीर छोड़ी:", f, e)
+    if not bigs:
+        bigs = [finish(cyber_bg(s).resize((BW, BH), Image.LANCZOS), mask) for s in range(4)]
+    return bigs, len(files)
+
+
+def crop_bg(big, t):
+    x = int((BW - W) * (0.5 + 0.5 * math.sin(t * 0.15)))
+    y = int((BH - H) * (0.5 + 0.5 * math.cos(t * 0.11)))
+    return big.crop((x, y, x + W, y + H))
+
+
+# ---------------- प्रेज़ेंटर ----------------
+def draw_presenter(mouth, blink):
+    s = 2
+    img = Image.new("RGBA", (400 * s, 500 * s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    def P(*v):
+        return [int(x * s) for x in v]
+
+    def pts(*p):
+        return [(int(x * s), int(y * s)) for x, y in p]
+
+    SKIN, SKIN_D = (226, 175, 138), (190, 136, 100)
+    SUIT, SUIT_L, SUIT_D = (28, 45, 85), (44, 68, 118), (16, 28, 55)
+    HAIR, WHITE, TIE = (38, 32, 30), (246, 248, 251), (232, 170, 20)
+    FRAME = (34, 34, 42)
+
+    # धड़, गर्दन, कमीज़, कोट के कॉलर और टाई
+    d.rounded_rectangle(P(40, 285, 360, 640), radius=int(90 * s), fill=SUIT)
+    d.rectangle(P(172, 205, 228, 292), fill=SKIN_D)
+    d.polygon(pts((160, 272), (240, 272), (200, 420)), fill=WHITE)
+    d.polygon(pts((150, 268), (200, 420), (145, 440), (100, 310)), fill=SUIT_L)
+    d.polygon(pts((250, 268), (200, 420), (255, 440), (300, 310)), fill=SUIT_L)
+    d.line(pts((150, 268), (200, 420)), fill=SUIT_D, width=int(3 * s))
+    d.line(pts((250, 268), (200, 420)), fill=SUIT_D, width=int(3 * s))
+    d.polygon(pts((190, 296), (210, 296), (206, 316), (194, 316)), fill=TIE)
+    d.polygon(pts((194, 316), (206, 316), (216, 410), (200, 432), (184, 410)), fill=TIE)
+
+    # कान, बाल (पीछे), चेहरा (गहरा आधार + हल्की परत = 3D जैसा असर)
+    d.ellipse(P(121, 140, 141, 182), fill=SKIN_D)
+    d.ellipse(P(259, 140, 279, 182), fill=SKIN_D)
+    d.ellipse(P(124, 54, 276, 170), fill=HAIR)
+    d.ellipse(P(129, 68, 273, 234), fill=SKIN_D)
+    d.ellipse(P(129, 68, 266, 230), fill=SKIN)
+    d.pieslice(P(129, 60, 271, 176), 180, 360, fill=HAIR)
+
+    # भौंहें, चश्मा
+    d.line(pts((160, 136), (190, 132)), fill=HAIR, width=int(6 * s))
+    d.line(pts((210, 132), (240, 136)), fill=HAIR, width=int(6 * s))
+    d.rounded_rectangle(P(154, 141, 196, 173), radius=int(10 * s), outline=FRAME, width=int(4 * s))
+    d.rounded_rectangle(P(204, 141, 246, 173), radius=int(10 * s), outline=FRAME, width=int(4 * s))
+    d.line(pts((196, 152), (204, 152)), fill=FRAME, width=int(4 * s))
+    d.line(pts((154, 150), (131, 146)), fill=FRAME, width=int(3 * s))
+    d.line(pts((246, 150), (269, 146)), fill=FRAME, width=int(3 * s))
+
+    # आँखें
+    for ex in (0, 50):
+        if blink:
+            d.line(pts((165 + ex, 158), (185 + ex, 158)), fill=(40, 30, 28), width=int(4 * s))
+        else:
+            d.ellipse(P(166 + ex, 150, 184 + ex, 164), fill=WHITE)
+            d.ellipse(P(171 + ex, 151, 181 + ex, 163), fill=(60, 40, 30))
+            d.ellipse(P(174 + ex, 154, 178 + ex, 160), fill=(10, 10, 10))
+
+    # नाक और मुँह
+    d.line(pts((200, 164), (195, 192), (205, 194)), fill=SKIN_D, width=int(3 * s))
+    if mouth == 0:
+        d.arc(P(180, 192, 220, 216), 20, 160, fill=(150, 70, 62), width=int(4 * s))
+    elif mouth == 1:
+        d.ellipse(P(187, 200, 213, 216), fill=(105, 32, 38))
+        d.ellipse(P(191, 208, 209, 216), fill=(190, 70, 76))
+    else:
+        d.ellipse(P(182, 198, 218, 226), fill=(105, 32, 38))
+        d.rectangle(P(188, 199, 212, 205), fill=WHITE)
+        d.ellipse(P(190, 214, 210, 225), fill=(190, 70, 76))
+    return img.resize((SPW, SPH), Image.LANCZOS)
+
+
+def make_glow():
+    g = Image.new("RGBA", (420, 420), (0, 170, 230, 0))
+    ImageDraw.Draw(g).ellipse((70, 70, 350, 350), fill=(0, 170, 230, 120))
+    return g.filter(ImageFilter.GaussianBlur(35))
+
+
+# ---------------- स्लाइड का टेक्स्ट कार्ड ----------------
+def text_layer(kind, title, body, idx, total):
     layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
-    f_title, f_body, f_foot = load_font(46, True), load_font(38), load_font(26)
-    d.rounded_rectangle((40, 50, 940, 690), radius=24, fill=(0, 0, 0, 120))
-    d.rounded_rectangle((60, 80, 70, 620), radius=5, fill=(255, 193, 7, 255))
-    y = 80
-    for line in wrap(d, title, f_title, 840):
-        d.text((100, y), line, font=f_title, fill=(255, 255, 255, 255))
-        y += 58
-    y += 25
-    for line in wrap(d, body, f_body, 800):
-        d.text((100, y), line, font=f_body, fill=(235, 240, 250, 255))
-        y += 60
-    d.text((100, 640), FOOTER, font=f_foot, fill=(255, 193, 7, 255))
+    acc = ACCENT + (255,)
+    white = (255, 255, 255, 255)
+    d.rounded_rectangle((40, 40, 930, 676), radius=28, fill=(5, 12, 30, 150),
+                        outline=(255, 255, 255, 50), width=2)
+    bw = int(tw(d, BRAND, 22, True)) + 36
+    d.rounded_rectangle((70, 64, 70 + bw, 102), radius=19, fill=acc)
+    draw_text(d, 88, 69, BRAND, 22, (20, 25, 40, 255), True)
+
+    if kind in ("intro", "outro"):
+        size = 64
+        lines = wrap(d, title, size, True, 820)
+        if len(lines) > 3:
+            size = 50
+            lines = wrap(d, title, size, True, 820)
+        lh = int(size * 1.3)
+        y = 360 - lh * len(lines) // 2
+        for line in lines:
+            draw_text(d, 100, y, line, size, white, True)
+            y += lh
+        d.rectangle((100, y + 10, 240, y + 15), fill=acc)
+    else:
+        size = 44
+        lines = wrap(d, title, size, True, 820)
+        if len(lines) > 3:
+            size = 36
+            lines = wrap(d, title, size, True, 820)
+        lh = int(size * 1.32)
+        y = 124
+        d.rounded_rectangle((60, y, 67, y + lh * len(lines)), radius=3, fill=acc)
+        for line in lines:
+            draw_text(d, 100, y, line, size, white, True)
+            y += lh
+        y += 10
+        d.rectangle((100, y, 220, y + 4), fill=acc)
+        y += 28
+        for line in wrap(d, body, 38, False, 820):
+            draw_text(d, 100, y, line, 38, (236, 241, 250, 255))
+            y += 60
+
+    x = 100
+    for j, part in enumerate(FOOTER_PARTS):
+        if j:
+            d.ellipse((x + 4, 649, x + 12, 657), fill=acc)
+            x += 24
+        draw_text(d, x, 638, part, 24, acc)
+        x += int(tw(d, part, 24)) + 10
+    txt = f"{idx} / {total}"
+    draw_text(d, 900 - int(tw(d, txt, 24)), 638, txt, 24, (200, 210, 225, 255))
     return layer
 
 
-def draw_character(img, t, speaking, frame_i):
-    d = ImageDraw.Draw(img)
-    bob = int(6 * math.sin(t * 3))
-    cx, top = 1070, 330 + bob
-    d.rounded_rectangle((cx - 110, top + 140, cx + 110, top + 330), radius=40, fill=(35, 110, 160))
-    d.ellipse((cx - 75, top, cx + 75, top + 150), fill=(212, 160, 120))
-    d.ellipse((cx - 35, top + 50, cx - 21, top + 66), fill=(20, 20, 20))
-    d.ellipse((cx + 21, top + 50, cx + 35, top + 66), fill=(20, 20, 20))
-    if speaking and (frame_i // 2) % 2 == 0:
-        d.ellipse((cx - 20, top + 95, cx + 20, top + 125), fill=(120, 30, 30))
-    else:
-        d.arc((cx - 28, top + 85, cx + 28, top + 120), 20, 160, fill=(90, 40, 30), width=4)
-
-
+# ---------------- आवाज़ ----------------
 async def tts(text, mp3):
     for _ in range(4):
         try:
@@ -187,40 +359,63 @@ async def make_audio(i, text):
     return wav, total, total - PAD
 
 
+# ---------------- मुख्य ----------------
+MOUTH = [1, 2, 1, 0, 2, 1, 2, 0]
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     os.makedirs(f"{TMP}/frames", exist_ok=True)
     title, body = read_article()
-    slides = [("", title)] + [(c, c) for c in make_chunks(body)]
-    bgs = load_backgrounds()
-    fallback = [cyber_bg(s) for s in range(4)] if not bgs else []
-    print("स्लाइड:", len(slides), "| तस्वीरें:", len(bgs))
+    slides = [("intro", title, "", title)]
+    for c in make_chunks(body):
+        slides.append(("body", title, c, c))
+    if OUTRO_SPEECH:
+        slides.append(("outro", OUTRO_TITLE, "", OUTRO_SPEECH))
 
-    wavs, n = [], 0
-    for i, (shown, spoken) in enumerate(slides):
+    bigs, photo_count = load_backgrounds()
+    sprites = {(m, b): draw_presenter(m, b) for m in range(3) for b in (0, 1)}
+    glow = make_glow()
+    print("स्लाइड:", len(slides), "| तस्वीरें:", photo_count)
+
+    wavs, n, prev_big = [], 0, None
+    for i, (kind, ttl, shown, spoken) in enumerate(slides):
         wav, total, speak_end = asyncio.run(make_audio(i, spoken))
         wavs.append(wav)
-        group = i // 3   # हर 3 स्लाइड पर तस्वीर बदलती है
-        bg = bgs[group % len(bgs)] if bgs else fallback[group % 4]
-        layer = text_layer(title, shown)
+        big = bigs[(i // 3) % len(bigs)]   # हर 3 स्लाइड पर तस्वीर बदलती है
+        layer = text_layer(kind, ttl, shown, i + 1, len(slides))
         alpha = layer.getchannel("A")
-        base = bg.copy()
-        base.paste(layer, (0, 0), layer)
         frames = max(1, round(total * FPS))
         fade = int(0.6 * FPS)
         for k in range(frames):
-            t = k / FPS
+            t = n / FPS
+            img = crop_bg(big, t)
+            if i % 3 == 0 and prev_big is not None and k < fade:
+                img = Image.blend(crop_bg(prev_big, t), img, (k + 1) / fade)
+            img.paste(glow, (895, 250), glow)
             if k < fade:
                 a = (k + 1) / fade
                 lay = layer.copy()
                 lay.putalpha(alpha.point(lambda v, a=a: int(v * a)))
-                img = bg.copy()
-                img.paste(lay, (0, 0), lay)
             else:
-                img = base.copy()
-            draw_character(img, t, t < speak_end, k)
+                lay = layer
+            img.paste(lay, (0, 0), lay)
+
+            speaking = (k / FPS) < speak_end
+            mouth = MOUTH[(k // 2) % len(MOUTH)] if speaking else 0
+            blink = 1 if n % 40 < 2 else 0
+            sprite = sprites[(mouth, blink)]
+            px = 955 + int(4 * math.sin(t * 1.2))
+            py = H - SPH + 3 + int(3 * math.sin(t * 2.4))
+            img.paste(sprite, (px, py), sprite)
+
+            prog = (i + (k + 1) / frames) / len(slides)
+            d = ImageDraw.Draw(img)
+            d.rectangle((0, H - 8, W, H), fill=(20, 30, 50))
+            d.rectangle((0, H - 8, int(W * prog), H), fill=ACCENT)
             img.save(f"{TMP}/frames/{n:05d}.jpg", quality=88)
             n += 1
+        prev_big = big
 
     with open(f"{TMP}/list.txt", "w") as f:
         for w in wavs:
